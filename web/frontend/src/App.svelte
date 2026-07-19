@@ -27,9 +27,40 @@
   let simulated = $state<string[]>([]);
   let busy = $state(false);
   let error = $state("");
+  let linkCopied = $state(false);
+
+  type ThemeMode = "light" | "dark" | "system";
+  let theme = $state<ThemeMode>((localStorage.getItem("theme") as ThemeMode) ?? "system");
 
   const hexes = $derived(swatches.map((s) => s.hex));
   const display = $derived(cvd === "none" ? hexes : simulated);
+  // Server-computed WCAG overlay colors; only valid while the swatch still matches
+  // the payload (a local edit or CVD preview falls back to the client estimate).
+  const textOn = $derived(
+    swatches.map((s, i) =>
+      cvd === "none" && payload?.colors[i]?.hex === s.hex
+        ? (payload.colors[i].text_on ?? null)
+        : null,
+    ),
+  );
+
+  function setTheme(t: ThemeMode) {
+    theme = t;
+    localStorage.setItem("theme", t);
+    if (t === "system") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = t;
+  }
+
+  function syncUrl() {
+    const p = new URLSearchParams();
+    p.set("c", hexes.map((h) => h.slice(1)).join("-"));
+    const locked = swatches.flatMap((s, i) => (s.locked ? [i] : []));
+    if (locked.length) p.set("l", locked.join("."));
+    p.set("scheme", scheme);
+    p.set("mode", mode);
+    if (seedText.trim()) p.set("seed", seedText.trim());
+    history.replaceState(null, "", `#${p.toString()}`);
+  }
 
   function applyPayload(doc: PalettePayload, keepLocks: boolean) {
     payload = doc;
@@ -38,6 +69,34 @@
       locked: keepLocks && (swatches[i]?.locked ?? false),
     }));
     refreshSim();
+    syncUrl();
+  }
+
+  /** Restore a palette from the URL hash; true if one was restored. */
+  async function restoreFromUrl(): Promise<boolean> {
+    const p = new URLSearchParams(location.hash.slice(1));
+    const c = p.get("c");
+    if (!c) return false;
+    const hx = c.split("-").map((h) => `#${h}`);
+    if (!hx.length || hx.some((h) => !/^#[0-9a-f]{6}$/i.test(h))) return false;
+    scheme = p.get("scheme") ?? scheme;
+    mode = p.get("mode") ?? mode;
+    seedText = p.get("seed") ?? "";
+    size = hx.length;
+    // Lock every slot to the URL's colors: the engine returns them exactly,
+    // along with the full score/contrast/roles payload.
+    const locks: Record<number, string> = Object.fromEntries(hx.map((h, i) => [i, h]));
+    const doc = await generatePalette({ scheme, size, mode, locks, seed: 0 });
+    applyPayload(doc, false);
+    const lockedSet = new Set((p.get("l") ?? "").split(".").filter(Boolean).map(Number));
+    swatches = swatches.map((s, i) => ({ ...s, locked: lockedSet.has(i) }));
+    return true;
+  }
+
+  async function copyLink() {
+    await navigator.clipboard.writeText(location.href);
+    linkCopied = true;
+    setTimeout(() => (linkCopied = false), 1100);
   }
 
   async function refreshSim() {
@@ -105,10 +164,15 @@
   // writes it on completion, so a tracking effect would re-trigger itself forever
   // (an infinite request loop against /api/generate).
   onMount(() => {
+    setTheme(theme);
     fetchMeta()
       .then((m) => (meta = m))
       .catch(() => (error = "API unreachable — is `palette serve` running?"));
-    doGenerate();
+    restoreFromUrl()
+      .then((restored) => {
+        if (!restored) doGenerate();
+      })
+      .catch(() => doGenerate());
   });
 </script>
 
@@ -125,6 +189,36 @@
     </div>
     <div class="meta-links">
       <span class="hint"><kbd>Space</kbd> to generate</span>
+      <button class="ghost" onclick={copyLink} title="Copy shareable link">
+        <Icon name={linkCopied ? "check" : "link"} size={13} />
+        {linkCopied ? "Copied" : "Share"}
+      </button>
+      <div class="segmented" role="group" aria-label="Theme">
+        <button
+          class:active={theme === "light"}
+          onclick={() => setTheme("light")}
+          title="Light theme"
+          aria-label="Light theme"
+        >
+          <Icon name="sun" size={13} />
+        </button>
+        <button
+          class:active={theme === "system"}
+          onclick={() => setTheme("system")}
+          title="Follow system theme"
+          aria-label="System theme"
+        >
+          <Icon name="monitor" size={13} />
+        </button>
+        <button
+          class:active={theme === "dark"}
+          onclick={() => setTheme("dark")}
+          title="Dark theme"
+          aria-label="Dark theme"
+        >
+          <Icon name="moon" size={13} />
+        </button>
+      </div>
       <a href="/docs" target="_blank" rel="noreferrer">
         API
         <Icon name="external-link" size={12} />
@@ -185,7 +279,7 @@
   {/if}
 
   {#if swatches.length}
-    <SwatchRow {swatches} {display} onToggleLock={toggleLock} onEdit={editColor} />
+    <SwatchRow {swatches} {display} {textOn} onToggleLock={toggleLock} onEdit={editColor} />
 
     <section class="cvd">
       <span class="cvd-label"><Icon name="eye" size={14} /> Vision</span>
@@ -288,6 +382,16 @@
     gap: 0.3rem;
   }
   .meta-links a:hover {
+    color: var(--accent);
+  }
+  .meta-links .segmented button {
+    padding: 0.32rem 0.5rem;
+  }
+  .meta-links .ghost {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .meta-links .ghost:hover {
     color: var(--accent);
   }
 

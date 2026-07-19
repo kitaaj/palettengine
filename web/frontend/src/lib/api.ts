@@ -3,6 +3,8 @@
 export interface ApiColor {
   hex: string;
   oklch: [number, number, number];
+  /** "#000000" or "#ffffff" — WCAG-chosen overlay text color for this swatch. */
+  text_on: string;
 }
 
 export interface PalettePayload {

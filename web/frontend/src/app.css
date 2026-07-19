@@ -26,8 +26,32 @@
   font-feature-settings: "cv05", "tnum";
 }
 
+/* Explicit theme override (set via the header toggle; absent = follow system). */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e1013;
+  --surface: #16191e;
+  --surface-2: #1e2229;
+  --text: #e8eaee;
+  --muted: #8a93a2;
+  --border: #262b33;
+  --accent: #5b8ffa;
+  --accent-strong: #78a3fb;
+  --ok: #34c48f;
+  --info: #78a3fb;
+  --warn: #e5a13c;
+  --danger: #ef6a5e;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 14px rgb(0 0 0 / 0.45);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #0e1013;
     --surface: #16191e;
     --surface-2: #1e2229;

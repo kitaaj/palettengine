@@ -25,6 +25,7 @@ def test_generate_default(client: TestClient) -> None:
     doc = r.json()
     assert len(doc["colors"]) == 5
     assert doc["colors"][0]["hex"].startswith("#")
+    assert all(c["text_on"] in ("#000000", "#ffffff") for c in doc["colors"])
     assert set(doc["roles"]) == {"light", "dark"}
     assert len(doc["contrast"]) == 5
     assert doc["score"] > 0
@@ -39,6 +40,16 @@ def test_generate_deterministic(client: TestClient) -> None:
 def test_generate_locks_hold(client: TestClient) -> None:
     r = client.post("/api/generate", json={"seed": 1, "locks": {"2": "#123456"}})
     assert r.json()["colors"][2]["hex"] == "#123456"
+
+
+def test_text_on_is_wcag_correct(client: TestClient) -> None:
+    # A locked near-black swatch must get white text; near-white gets black.
+    r = client.post(
+        "/api/generate", json={"seed": 1, "locks": {"0": "#0a0a0a", "1": "#f8f8f8"}}
+    )
+    colors = r.json()["colors"]
+    assert colors[0]["text_on"] == "#ffffff"
+    assert colors[1]["text_on"] == "#000000"
 
 
 def test_generate_bad_scheme_422(client: TestClient) -> None:

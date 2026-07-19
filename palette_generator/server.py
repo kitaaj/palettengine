@@ -24,6 +24,7 @@ from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
 from .accessibility import CVD_KINDS, contrast_matrix, simulate_palette
+from .color import contrast_ratio
 from .export import BINARY_FORMATS, FORMATS
 from .export import export as export_palette
 from .generate import generate
@@ -71,11 +72,24 @@ class ColormindRequest(BaseModel):
 # --------------------------------------------------------------------------- #
 # serialization helpers
 # --------------------------------------------------------------------------- #
+def _text_on(color: Color) -> str:
+    """Black or white, whichever has the higher WCAG contrast on ``color``."""
+    rgb = color.rgb
+    black = contrast_ratio((0.0, 0.0, 0.0), rgb)
+    white = contrast_ratio((1.0, 1.0, 1.0), rgb)
+    return "#000000" if black >= white else "#ffffff"
+
+
 def _palette_payload(palette: Palette, mode: str = "general") -> dict[str, Any]:
     colors = list(palette)
     return {
         "colors": [
-            {"hex": c.hex, "oklch": [round(v, 4) for v in c.oklch]} for c in colors
+            {
+                "hex": c.hex,
+                "oklch": [round(v, 4) for v in c.oklch],
+                "text_on": _text_on(c),
+            }
+            for c in colors
         ],
         "score": round(score(colors, mode), 4),
         "breakdown": {k: round(v, 4) for k, v in score_breakdown(colors, mode).items()},

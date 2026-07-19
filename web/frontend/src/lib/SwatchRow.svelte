@@ -11,22 +11,30 @@
   let {
     swatches,
     display,
+    textOn = [],
     onToggleLock,
     onEdit,
   }: {
     swatches: Swatch[];
     /** Hexes to actually paint (may be CVD-simulated versions). */
     display: string[];
+    /** Server-computed WCAG overlay colors; null entries fall back to the local estimate. */
+    textOn?: (string | null)[];
     onToggleLock: (i: number) => void;
     onEdit: (i: number, hex: string) => void;
   } = $props();
 
   let copiedIndex = $state(-1);
 
-  function textColorOn(hex: string): string {
+  /** Local fallback when no server value applies (e.g. mid-edit or CVD preview). */
+  function estimateTextOn(hex: string): string {
     const n = parseInt(hex.slice(1), 16);
     const lum = 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
     return lum > 140 ? "rgb(0 0 0 / 0.82)" : "rgb(255 255 255 / 0.92)";
+  }
+
+  function overlayColor(i: number): string {
+    return textOn[i] ?? estimateTextOn(display[i] ?? swatches[i].hex);
   }
 
   async function copyHex(i: number) {
@@ -46,7 +54,7 @@
       class="swatch"
       class:locked={sw.locked}
       role="listitem"
-      style="background:{display[i] ?? sw.hex}; color:{textColorOn(display[i] ?? sw.hex)}"
+      style="background:{display[i] ?? sw.hex}; color:{overlayColor(i)}"
     >
       <div class="actions">
         <button
@@ -86,6 +94,23 @@
     border-radius: var(--radius);
     overflow: hidden;
     box-shadow: var(--shadow-md);
+  }
+  @media (max-width: 640px) {
+    .row {
+      flex-direction: column;
+    }
+    .row :global(.swatch),
+    .swatch {
+      flex-direction: row;
+      justify-content: space-between;
+      padding: 0.7rem 1rem;
+      min-height: 3.4rem;
+    }
+    .actions {
+      flex-direction: row;
+      opacity: 1;
+      transform: none;
+    }
   }
   .swatch {
     flex: 1;
