@@ -1,10 +1,8 @@
 <script lang="ts">
   import { exportPalette } from "./api";
+  import Icon from "./Icon.svelte";
 
-  let {
-    hexes,
-    formats,
-  }: { hexes: string[]; formats: string[] } = $props();
+  let { hexes, formats }: { hexes: string[]; formats: string[] } = $props();
 
   let format = $state("css");
   let rolesTheme = $state("none");
@@ -19,7 +17,7 @@
       rt = rolesTheme,
       hx = hexes;
     if (BINARY.has(f)) {
-      preview = "(binary format — use Download)";
+      preview = "Binary format — use Download.";
       return;
     }
     let cancelled = false;
@@ -38,7 +36,7 @@
   async function copy() {
     await navigator.clipboard.writeText(preview);
     copied = true;
-    setTimeout(() => (copied = false), 1200);
+    setTimeout(() => (copied = false), 1100);
   }
 
   async function download() {
@@ -64,7 +62,7 @@
 <div class="panel">
   <div class="controls">
     <label>
-      format
+      <span class="label">Format</span>
       <select bind:value={format}>
         {#each formats as f (f)}
           <option value={f}>{f}</option>
@@ -72,15 +70,22 @@
       </select>
     </label>
     <label>
-      roles
+      <span class="label">Roles</span>
       <select bind:value={rolesTheme}>
         <option value="none">none</option>
         <option value="light">light</option>
         <option value="dark">dark</option>
       </select>
     </label>
-    <button onclick={copy} disabled={BINARY.has(format)}>{copied ? "copied!" : "copy"}</button>
-    <button onclick={download}>download</button>
+    <div class="spacer"></div>
+    <button onclick={copy} disabled={BINARY.has(format)} title="Copy to clipboard">
+      <Icon name={copied ? "check" : "copy"} />
+      {copied ? "Copied" : "Copy"}
+    </button>
+    <button onclick={download} title="Download file">
+      <Icon name="download" />
+      Download
+    </button>
   </div>
   <pre>{preview}</pre>
 </div>
@@ -89,7 +94,7 @@
   .panel {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: 0.7rem;
   }
   .controls {
     display: flex;
@@ -97,21 +102,23 @@
     align-items: end;
     flex-wrap: wrap;
   }
+  .spacer {
+    flex: 1;
+  }
   label {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    font-size: 0.8rem;
-    color: var(--muted);
+    gap: 0.3rem;
   }
   pre {
-    background: var(--surface);
+    background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.9rem;
+    border-radius: var(--radius-sm);
+    padding: 0.85rem 1rem;
     max-height: 300px;
     overflow: auto;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
+    line-height: 1.55;
     margin: 0;
   }
 </style>

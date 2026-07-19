@@ -6,6 +6,8 @@
 </script>
 
 <script lang="ts">
+  import Icon from "./Icon.svelte";
+
   let {
     swatches,
     display,
@@ -19,45 +21,60 @@
     onEdit: (i: number, hex: string) => void;
   } = $props();
 
+  let copiedIndex = $state(-1);
+
   function textColorOn(hex: string): string {
-    // Quick relative-luminance estimate for label legibility.
     const n = parseInt(hex.slice(1), 16);
-    const r = (n >> 16) & 255,
-      g = (n >> 8) & 255,
-      b = n & 255;
-    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    return lum > 140 ? "#111" : "#fff";
+    const lum = 0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
+    return lum > 140 ? "rgb(0 0 0 / 0.82)" : "rgb(255 255 255 / 0.92)";
   }
 
-  async function copyHex(hex: string) {
+  async function copyHex(i: number) {
     try {
-      await navigator.clipboard.writeText(hex);
+      await navigator.clipboard.writeText(swatches[i].hex);
+      copiedIndex = i;
+      setTimeout(() => (copiedIndex = -1), 1100);
     } catch {
-      /* clipboard unavailable; ignore */
+      /* clipboard unavailable */
     }
   }
 </script>
 
-<div class="row">
+<div class="row" role="list">
   {#each swatches as sw, i (i)}
-    <div class="swatch" style="background:{display[i] ?? sw.hex}; color:{textColorOn(display[i] ?? sw.hex)}">
-      <button
-        class="lock"
-        title={sw.locked ? "unlock" : "lock"}
-        aria-label={sw.locked ? "unlock color" : "lock color"}
-        onclick={() => onToggleLock(i)}
-      >
-        {sw.locked ? "🔒" : "🔓"}
-      </button>
-      <button class="hex" title="copy hex" onclick={() => copyHex(sw.hex)}>{sw.hex}</button>
-      <label class="edit" title="edit color">
-        ✎
-        <input
-          type="color"
-          value={sw.hex}
-          oninput={(e) => onEdit(i, (e.target as HTMLInputElement).value)}
-        />
-      </label>
+    <div
+      class="swatch"
+      class:locked={sw.locked}
+      role="listitem"
+      style="background:{display[i] ?? sw.hex}; color:{textColorOn(display[i] ?? sw.hex)}"
+    >
+      <div class="actions">
+        <button
+          class="action lock"
+          title={sw.locked ? "Unlock color" : "Lock color"}
+          aria-label={sw.locked ? "Unlock color" : "Lock color"}
+          onclick={() => onToggleLock(i)}
+        >
+          <Icon name={sw.locked ? "lock" : "unlock"} />
+        </button>
+        <button
+          class="action"
+          title="Copy hex"
+          aria-label="Copy hex value"
+          onclick={() => copyHex(i)}
+        >
+          <Icon name={copiedIndex === i ? "check" : "copy"} />
+        </button>
+        <label class="action" title="Edit color" aria-label="Edit color">
+          <Icon name="droplet" />
+          <input
+            type="color"
+            value={sw.hex}
+            oninput={(e) => onEdit(i, (e.target as HTMLInputElement).value)}
+          />
+        </label>
+      </div>
+      <span class="hex">{sw.hex}</span>
     </div>
   {/each}
 </div>
@@ -65,9 +82,10 @@
 <style>
   .row {
     display: flex;
-    min-height: 240px;
-    border-radius: 14px;
+    min-height: 260px;
+    border-radius: var(--radius);
     overflow: hidden;
+    box-shadow: var(--shadow-md);
   }
   .swatch {
     flex: 1;
@@ -75,36 +93,54 @@
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.4rem;
-    padding: 1rem 0.4rem;
-    position: relative;
+    gap: 0.55rem;
+    padding: 1rem 0.4rem 1.1rem;
+    transition: flex-grow 160ms ease;
   }
-  .swatch button,
-  .swatch .edit {
-    background: none;
+  .actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    opacity: 0;
+    transform: translateY(4px);
+    transition:
+      opacity 140ms ease,
+      transform 140ms ease;
+  }
+  .swatch:hover .actions,
+  .swatch:focus-within .actions {
+    opacity: 1;
+    transform: none;
+  }
+  /* A locked swatch always shows its lock state, even without hover. */
+  .swatch.locked .actions {
+    opacity: 1;
+    transform: none;
+  }
+  .action {
+    background: transparent;
     border: none;
+    box-shadow: none;
     color: inherit;
-    opacity: 0.85;
-  }
-  .lock {
-    position: absolute;
-    top: 0.6rem;
-    right: 0.6rem;
-    font-size: 1rem;
-  }
-  .hex {
-    font-family: ui-monospace, Consolas, monospace;
-    font-size: 0.95rem;
-    letter-spacing: 0.02em;
-  }
-  .edit {
+    padding: 0.42rem;
+    border-radius: var(--radius-sm);
+    display: inline-flex;
     cursor: pointer;
-    font-size: 0.9rem;
   }
-  .edit input {
+  .action:hover {
+    background: rgb(127 127 127 / 0.22);
+    border: none;
+  }
+  .action input {
+    position: absolute;
     width: 0;
     height: 0;
     opacity: 0;
-    position: absolute;
+  }
+  .hex {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 0.86rem;
+    letter-spacing: 0.03em;
+    user-select: all;
   }
 </style>
