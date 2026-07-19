@@ -64,23 +64,14 @@ def _emit_export(args: argparse.Namespace, palette: Palette) -> None:
         print(data)
 
 
-def _cmd_generate(args: argparse.Namespace) -> int:
-    locks = dict(_parse_lock(s) for s in args.lock) if args.lock else None
-    palette = generate(
-        base=args.base,
-        scheme=args.scheme,
-        size=args.size,
-        locks=locks,
-        seed=args.seed,
-        mode=args.mode,
-        candidates=args.candidates,
-    )
+def _emit(args: argparse.Namespace, palette: Palette) -> None:
+    """Shared post-processing + output for generate and extract."""
     if args.simulate:
         palette = simulate_palette(palette, args.simulate)
 
     if args.export:
         _emit_export(args, palette)
-        return 0
+        return
 
     if args.format == "hex":
         use_color = sys.stdout.isatty() and not args.no_color
@@ -98,6 +89,42 @@ def _cmd_generate(args: argparse.Namespace) -> int:
         if args.roles != "none":
             doc["roles"] = {n: c.hex for n, c in assign_roles(palette, args.roles).items()}
         print(json.dumps(doc, indent=2))
+
+
+def _cmd_generate(args: argparse.Namespace) -> int:
+    locks = dict(_parse_lock(s) for s in args.lock) if args.lock else None
+    palette = generate(
+        base=args.base,
+        scheme=args.scheme,
+        size=args.size,
+        locks=locks,
+        seed=args.seed,
+        mode=args.mode,
+        candidates=args.candidates,
+    )
+    _emit(args, palette)
+    return 0
+
+
+def _cmd_extract(args: argparse.Namespace) -> int:
+    try:
+        from . import extract as ex
+    except ImportError as exc:  # numpy/Pillow not installed
+        raise ValueError(
+            f"extraction needs the [image] extra: pip install 'palette-generator[image]' ({exc})"
+        ) from exc
+
+    is_video = ex.is_video_path(args.source) if args.kind == "auto" else args.kind == "video"
+    fn = ex.extract_video if is_video else ex.extract_image
+    palette = fn(
+        args.source,
+        size=args.size,
+        seed=args.seed,
+        mode=args.mode,
+        faithful=args.faithful,
+        candidates=args.candidates,
+    )
+    _emit(args, palette)
     return 0
 
 
@@ -106,6 +133,32 @@ def _print_roles(palette: Palette, theme: str, *, color: bool) -> None:
     for name, c in assign_roles(palette, theme).items():
         swatch = _swatch(c) + " " if color else ""
         print(f"  {swatch}{name:<12} {c.hex}")
+
+
+def _add_output_args(p: argparse.ArgumentParser) -> None:
+    """Output/post-processing options shared by generate and extract."""
+    p.add_argument(
+        "--format", default="hex", choices=["hex", "list", "json"], help="console output format"
+    )
+    p.add_argument(
+        "--roles",
+        default="none",
+        choices=["none", "light", "dark"],
+        help="assign semantic UI roles for a light/dark theme",
+    )
+    p.add_argument(
+        "--export",
+        choices=list(FORMATS),
+        help="serialize to a design/dev format instead of the console view",
+    )
+    p.add_argument("--out", metavar="FILE", help="write --export output to a file")
+    p.add_argument(
+        "--simulate",
+        choices=list(CVD_KINDS),
+        help="preview the palette under a color-vision deficiency",
+    )
+    p.add_argument("--explain", action="store_true", help="show the quality score breakdown")
+    p.add_argument("--no-color", action="store_true", help="disable ANSI swatches")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -131,29 +184,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="pin a slot to a color, e.g. --lock 0:#222222 (repeatable)",
     )
     g.add_argument("--candidates", type=int, default=240, help="candidates to sample")
-    g.add_argument(
-        "--format", default="hex", choices=["hex", "list", "json"], help="console output format"
-    )
-    g.add_argument(
-        "--roles",
-        default="none",
-        choices=["none", "light", "dark"],
-        help="assign semantic UI roles for a light/dark theme",
-    )
-    g.add_argument(
-        "--export",
-        choices=list(FORMATS),
-        help="serialize to a design/dev format instead of the console view",
-    )
-    g.add_argument("--out", metavar="FILE", help="write --export output to a file")
-    g.add_argument(
-        "--simulate",
-        choices=list(CVD_KINDS),
-        help="preview the palette under a color-vision deficiency",
-    )
-    g.add_argument("--explain", action="store_true", help="show the quality score breakdown")
-    g.add_argument("--no-color", action="store_true", help="disable ANSI swatches")
+    _add_output_args(g)
     g.set_defaults(func=_cmd_generate)
+
+    e = sub.add_parser("extract", help="extract a palette from an image or video")
+    e.add_argument("source", help="path to an image or video file")
+    e.add_argument("--size", type=int, default=5, help="number of colors (default: 5)")
+    e.add_argument("--mode", default="general", choices=["general", "ui"], help="scoring mode")
+    e.add_argument("--seed", type=int, default=None, help="RNG seed for reproducible output")
+    e.add_argument(
+        "--kind",
+        default="auto",
+        choices=["auto", "image", "video"],
+        help="treat source as image/video (default: auto-detect by extension)",
+    )
+    e.add_argument(
+        "--faithful",
+        action="store_true",
+        help="return the most representative colors instead of the best-scoring palette",
+    )
+    e.add_argument("--candidates", type=int, default=300, help="candidate palettes to score")
+    _add_output_args(e)
+    e.set_defaults(func=_cmd_extract)
     return parser
 
 

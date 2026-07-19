@@ -38,5 +38,12 @@ python_version = "3.11"
 strict = true
 warn_unused_ignores = true
 
+# numpy operations are typed loosely; keep strictness but tolerate Any-returning
+# array expressions in the extraction layer.
+[[tool.mypy.overrides]]
+module = "palette_generator.extract.*"
+warn_return_any = false
+disallow_any_explicit = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
