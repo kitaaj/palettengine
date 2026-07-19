@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import {
     extractPalette,
     fetchMeta,
@@ -99,7 +100,10 @@
     }
   }
 
-  $effect(() => {
+  // One-time init. NOT an $effect: doGenerate() reads `swatches` synchronously and
+  // writes it on completion, so a tracking effect would re-trigger itself forever
+  // (an infinite request loop against /api/generate).
+  onMount(() => {
     fetchMeta()
       .then((m) => (meta = m))
       .catch(() => (error = "API unreachable — is `palette serve` running?"));
