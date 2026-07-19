@@ -128,6 +128,17 @@ def _cmd_extract(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_serve(args: argparse.Namespace) -> int:
+    try:
+        import uvicorn
+    except ImportError as exc:
+        raise ValueError(
+            f"serving needs the [web] extra: pip install 'palette-generator[web]' ({exc})"
+        ) from exc
+    uvicorn.run("palette_generator.server:app", host=args.host, port=args.port)
+    return 0
+
+
 def _print_roles(palette: Palette, theme: str, *, color: bool) -> None:
     print(f"\nroles ({theme}):")
     for name, c in assign_roles(palette, theme).items():
@@ -206,6 +217,11 @@ def build_parser() -> argparse.ArgumentParser:
     e.add_argument("--candidates", type=int, default=300, help="candidate palettes to score")
     _add_output_args(e)
     e.set_defaults(func=_cmd_extract)
+
+    s = sub.add_parser("serve", help="run the web UI + JSON API server")
+    s.add_argument("--host", default="127.0.0.1", help="bind address (default: 127.0.0.1)")
+    s.add_argument("--port", type=int, default=8710, help="port (default: 8710)")
+    s.set_defaults(func=_cmd_serve)
     return parser
 
 

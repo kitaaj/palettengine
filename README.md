@@ -9,9 +9,10 @@ See [PLAN.md](PLAN.md) for the full design and roadmap.
 
 ## Status
 
-Early development. Done: **Phase 0–3** — color foundation, generation engine + CLI,
+Early development. Done: **Phase 0–4** — color foundation, generation engine + CLI,
 accessibility (WCAG auto-fix + colorblind sim), semantic roles, exporters,
-and image/video extraction. Next: the web UI + API.
+image/video extraction, and a **web UI + JSON API** (with Colormind-compatible
+endpoints). Next: optional ML scoring layer.
 
 ## Layout
 
@@ -24,10 +25,22 @@ palette_generator/     # the library
   roles/               # semantic role assignment (primary/bg/text/…)
   export/              # JSON / CSS / SCSS / Tailwind / tokens / SVG / GPL / ASE
   extract/             # image/video -> palette (perceptual k-means + scorer)
-  cli.py               # `palette generate` / `palette extract`
-web/                   # FastAPI backend + SPA (later phases)
+  cli.py               # `palette generate` / `palette extract` / `palette serve`
+  server.py            # FastAPI JSON API + static UI + Colormind-compatible shims
+web/frontend/          # Svelte 5 + Vite SPA (swatches, locks, contrast grid, CVD, export)
 tests/                 # pytest + hypothesis
 ```
+
+## Web UI
+
+```bash
+cd web/frontend && npm install && npm run build   # once
+palette serve                                     # http://127.0.0.1:8710
+```
+
+The JSON API lives under `/api/*` (see `/docs` for OpenAPI). Colormind clients work
+as-is against `POST /api/` and `GET /list/` — with the improvement that locked input
+colors are returned exactly.
 
 ## Examples
 
