@@ -34,8 +34,11 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
+# Type-check targeting 3.12: newer numpy ships PEP 695 `type` statements in its stubs
+# that mypy only parses under a >=3.12 target. Runtime 3.11 support is still verified by
+# the test suite (CI runs pytest on 3.11 and 3.12).
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 strict = true
 warn_unused_ignores = true
 
