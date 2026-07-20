@@ -88,7 +88,7 @@ def generate(
         Optional base color (hex). Seeds the primary hue and, unless a lock already
         occupies slot 0, is pinned there so it appears in the result.
     scheme:
-        A key of :data:`palette_generator.harmony.SCHEMES`, or ``"auto"``.
+        A key of :data:`palettengine.harmony.SCHEMES`, or ``"auto"``.
     size:
         Number of colors (>= 1).
     locks:

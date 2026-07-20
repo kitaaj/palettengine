@@ -2,7 +2,7 @@
 
 Pixels are converted to OKLab (vectorized with numpy) and clustered with a seeded
 k-means, so grouping happens in a perceptually-uniform space rather than in raw RGB.
-The OKLab matrix constants mirror :mod:`palette_generator.color.spaces`; they are
+The OKLab matrix constants mirror :mod:`palettengine.color.spaces`; they are
 duplicated here only so the core color module can stay numpy-free.
 """
 

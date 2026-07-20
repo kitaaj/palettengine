@@ -111,7 +111,7 @@ def _cmd_extract(args: argparse.Namespace) -> int:
         from . import extract as ex
     except ImportError as exc:  # numpy/Pillow not installed
         raise ValueError(
-            f"extraction needs the [image] extra: pip install 'palette-generator[image]' ({exc})"
+            f"extraction needs the [image] extra: pip install 'palettengine[image]' ({exc})"
         ) from exc
 
     is_video = ex.is_video_path(args.source) if args.kind == "auto" else args.kind == "video"
@@ -133,9 +133,9 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         import uvicorn
     except ImportError as exc:
         raise ValueError(
-            f"serving needs the [web] extra: pip install 'palette-generator[web]' ({exc})"
+            f"serving needs the [web] extra: pip install 'palettengine[web]' ({exc})"
         ) from exc
-    uvicorn.run("palette_generator.server:app", host=args.host, port=args.port)
+    uvicorn.run("palettengine.server:app", host=args.host, port=args.port)
     return 0
 
 

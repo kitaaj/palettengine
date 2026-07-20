@@ -6,9 +6,9 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from palette_generator.color import contrast as c
-from palette_generator.color import difference as d
-from palette_generator.color import spaces as s
+from palettengine.color import contrast as c
+from palettengine.color import difference as d
+from palettengine.color import spaces as s
 
 
 def test_black_white_is_max_contrast() -> None:

@@ -8,7 +8,7 @@ import struct
 import pytest
 from fastapi.testclient import TestClient
 
-from palette_generator.server import create_app
+from palettengine.server import create_app
 
 
 @pytest.fixture(scope="module")

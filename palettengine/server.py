@@ -10,7 +10,7 @@ Endpoints
 - ``POST /api/``, ``GET /list/`` — Colormind-compatible shims
 - ``GET  /``              — the built Svelte UI (when ``web/frontend/dist`` exists)
 
-Run with ``palette serve`` or ``uvicorn palette_generator.server:app``.
+Run with ``palette serve`` or ``uvicorn palettengine.server:app``.
 """
 
 from __future__ import annotations
@@ -112,7 +112,7 @@ def _parse_hexes(hexes: list[str]) -> Palette:
 # app factory
 # --------------------------------------------------------------------------- #
 def create_app() -> FastAPI:
-    app = FastAPI(title="palette-generator", version="0.2.0")
+    app = FastAPI(title="palettengine", version="0.2.0")
 
     @app.post("/api/generate")
     def api_generate(req: GenerateRequest) -> dict[str, Any]:

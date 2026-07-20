@@ -291,7 +291,7 @@
         <circle cx="9" cy="9" r="6.5" fill="var(--accent)" opacity="0.9" />
         <circle cx="15" cy="15" r="6.5" fill="var(--ok)" opacity="0.75" />
       </svg>
-      <h1>Palette<span>Generator</span></h1>
+      <h1 class="wordmark">palett<span class="pivot">e</span>ngine</h1>
     </div>
     <div class="meta-links">
       <span class="hint"><kbd>Space</kbd> to generate</span>
@@ -508,15 +508,15 @@
     align-items: center;
     gap: 0.6rem;
   }
-  h1 {
+  h1.wordmark {
     margin: 0;
-    font-size: 1.25rem;
+    font-size: 1.3rem;
     font-weight: 700;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
   }
-  h1 span {
-    color: var(--muted);
-    font-weight: 400;
+  /* The shared E — where "palette" and "engine" meet — carries the accent. */
+  h1 .pivot {
+    color: var(--accent);
   }
   .meta-links {
     display: flex;

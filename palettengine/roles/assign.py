@@ -3,7 +3,7 @@
 Colormind returns five anonymous swatches; a designer still has to decide which is the
 background, which is text, which is the primary accent. This module makes that decision
 using lightness and chroma, and guarantees the ``text`` role is readable on ``background``
-(via :func:`palette_generator.accessibility.auto_fix`), producing a drop-in light or dark theme.
+(via :func:`palettengine.accessibility.auto_fix`), producing a drop-in light or dark theme.
 """
 
 from __future__ import annotations

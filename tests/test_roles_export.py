@@ -6,10 +6,10 @@ import struct
 
 import pytest
 
-from palette_generator.color import passes_wcag
-from palette_generator.export import FORMATS, export, to_ase, to_css, to_gpl, to_json
-from palette_generator.model import Color, Palette
-from palette_generator.roles import ROLE_ORDER, assign_roles
+from palettengine.color import passes_wcag
+from palettengine.export import FORMATS, export, to_ase, to_css, to_gpl, to_json
+from palettengine.model import Color, Palette
+from palettengine.roles import ROLE_ORDER, assign_roles
 
 
 def _palette() -> Palette:

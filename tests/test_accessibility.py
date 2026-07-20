@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from palette_generator.accessibility import (
+from palettengine.accessibility import (
     CVD_KINDS,
     auto_fix,
     best_text_color,
@@ -12,8 +12,8 @@ from palette_generator.accessibility import (
     simulate,
     simulate_palette,
 )
-from palette_generator.color import contrast_ratio, passes_wcag
-from palette_generator.model import Color, Palette
+from palettengine.color import contrast_ratio, passes_wcag
+from palettengine.model import Color, Palette
 
 
 def _c(h: str) -> Color:

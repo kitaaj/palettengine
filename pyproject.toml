@@ -3,13 +3,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "palette-generator"
+name = "palettengine"
 version = "0.2.0"
 description = "Perceptual, accessible color palette generator with a color-theory engine and optional ML layer."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "palette_generator authors" }]
+authors = [{ name = "palettengine authors" }]
 keywords = ["color", "palette", "oklab", "oklch", "wcag", "design", "accessibility"]
 dependencies = []
 
@@ -21,10 +21,11 @@ web = ["fastapi>=0.110", "uvicorn>=0.29", "python-multipart>=0.0.9"]
 dev = ["pytest>=8.0", "hypothesis>=6.90", "ruff>=0.4", "mypy>=1.9"]
 
 [project.scripts]
-palette = "palette_generator.cli:main"
+palette = "palettengine.cli:main"
+palettengine = "palettengine.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["palette_generator"]
+packages = ["palettengine"]
 
 [tool.ruff]
 line-length = 100
@@ -41,7 +42,7 @@ warn_unused_ignores = true
 # numpy operations are typed loosely; keep strictness but tolerate Any-returning
 # array expressions in the extraction layer.
 [[tool.mypy.overrides]]
-module = "palette_generator.extract.*"
+module = "palettengine.extract.*"
 warn_return_any = false
 disallow_any_explicit = false
 

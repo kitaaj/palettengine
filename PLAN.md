@@ -1,4 +1,4 @@
-# Palette Generator — Design & Build Plan
+# Palettengine — Design & Build Plan
 
 An improved, self-contained color palette generator inspired by [Colormind](https://colormind.io),
 built as a **Python library + CLI** with a **web UI** on top. Core generation is a **hybrid**:
@@ -69,7 +69,7 @@ model layer added later. No GPU required to ship v1.
 ## 4. Architecture
 
 ```
-palette_generator/               # the Python package (the core)
+palettengine/               # the Python package (the core)
 ├── color/                       # color primitives & conversions
 │   ├── spaces.py                # sRGB ↔ linear ↔ OKLab ↔ OKLCH ↔ HSL, hex
 │   ├── difference.py            # ΔE (CIEDE2000 / OKLab distance)
@@ -205,7 +205,7 @@ Keep a **Colormind-compatible** `/api/` shape too, so existing clients can point
   `color/spaces.py` (no heavy dep needed) or `coloraide` for validation.
 - **Backend**: `FastAPI` + `uvicorn`.
 - **ML (optional)**: `scikit-learn` (k-means, small classifier) first; `torch` only if we build a
-  refiner. Isolated in an extra: `pip install palette-generator[ml]`.
+  refiner. Isolated in an extra: `pip install palettengine[ml]`.
 - **Testing**: `pytest`, `hypothesis` (property tests for color round-trips), snapshot tests.
 - **Quality**: `ruff` + `mypy`.
 - **Frontend**: Vite + React/Svelte + TypeScript.

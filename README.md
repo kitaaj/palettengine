@@ -1,4 +1,4 @@
-# palette-generator
+# palettengine
 
 A perceptual, accessible color palette generator — a self-contained, improved take on
 [Colormind](https://colormind.io). All color reasoning happens in **OKLab/OKLCH**
@@ -7,7 +7,7 @@ A perceptual, accessible color palette generator — a self-contained, improved 
 
 ## Why it's better than the tools it's inspired by
 
-| | palette-generator | typical generators |
+| | palettengine | typical generators |
 |---|---|---|
 | Color space | OKLCH (perceptually uniform) | RGB / HSL |
 | Locks | **Hard** — locked colors return exactly | often drift |
@@ -63,7 +63,7 @@ OpenAPI docs at `/docs`. Highlights:
 ## Architecture
 
 ```
-palette_generator/
+palettengine/
   color/           # sRGB / linear / OKLab / OKLCH / HSL / hex, WCAG contrast, ΔE
   harmony/         # 7 color-theory schemes + seeded auto
   generate/        # deterministic engine + transparent quality scorer
@@ -84,7 +84,7 @@ Design notes in [PLAN.md](PLAN.md).
 ```bash
 ./.venv/Scripts/python -m pytest          # backend: 121 tests
 ./.venv/Scripts/python -m ruff check .    # lint
-./.venv/Scripts/python -m mypy palette_generator
+./.venv/Scripts/python -m mypy palettengine
 cd web/frontend && npm test               # frontend color math vs. reference vectors
 cd web/frontend && npm run dev            # Vite dev server (proxies /api to :8710)
 ```

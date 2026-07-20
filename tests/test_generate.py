@@ -6,11 +6,11 @@ import random
 
 import pytest
 
-from palette_generator.color import contrast_ratio
-from palette_generator.generate import generate, score
-from palette_generator.generate.scorer import score_breakdown
-from palette_generator.harmony import resolve_scheme, scheme_hues
-from palette_generator.model import Color, Palette
+from palettengine.color import contrast_ratio
+from palettengine.generate import generate, score
+from palettengine.generate.scorer import score_breakdown
+from palettengine.harmony import resolve_scheme, scheme_hues
+from palettengine.model import Color, Palette
 
 
 # --------------------------------------------------------------------------- #
@@ -83,7 +83,7 @@ def test_lock_out_of_range_raises() -> None:
 
 
 def test_all_colors_in_gamut() -> None:
-    from palette_generator.color import in_gamut
+    from palettengine.color import in_gamut
 
     for c in generate(seed=11, size=6):
         assert in_gamut(c.rgb)

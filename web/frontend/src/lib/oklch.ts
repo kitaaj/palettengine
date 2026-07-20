@@ -1,6 +1,6 @@
 /**
  * Minimal OKLCH <-> sRGB conversions for live editing in the UI.
- * Ported from palette_generator/color/spaces.py (Björn Ottosson's OKLab constants);
+ * Ported from palettengine/color/spaces.py (Björn Ottosson's OKLab constants);
  * the server remains the source of truth for scoring/roles — this exists so slider
  * dragging can preview colors without a network round-trip.
  */

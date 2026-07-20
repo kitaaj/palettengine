@@ -1,7 +1,7 @@
 """Palette serializers.
 
-Each ``to_*`` function takes a :class:`~palette_generator.model.Palette` and an optional
-``roles`` mapping (from :func:`palette_generator.roles.assign_roles`). When roles are given,
+Each ``to_*`` function takes a :class:`~palettengine.model.Palette` and an optional
+``roles`` mapping (from :func:`palettengine.roles.assign_roles`). When roles are given,
 named entries (``--color-primary`` etc.) are emitted alongside the indexed swatches.
 
 Text formats return ``str``; binary formats (ASE) return ``bytes``. Use :func:`export`
@@ -119,7 +119,7 @@ def to_svg(palette: Palette, roles: Roles = None) -> str:
 
 def to_gpl(palette: Palette, roles: Roles = None) -> str:
     """GIMP / Inkscape palette (.gpl)."""
-    lines = ["GIMP Palette", "Name: palette-generator", f"Columns: {len(palette) or 1}", "#"]
+    lines = ["GIMP Palette", "Name: palettengine", f"Columns: {len(palette) or 1}", "#"]
     for name, color in _entries(palette, roles):
         r, g, b = (round(clamp(v) * 255) for v in color.rgb)
         lines.append(f"{r:3d} {g:3d} {b:3d}\t{name} {color.hex}")

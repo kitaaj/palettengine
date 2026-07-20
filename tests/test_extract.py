@@ -5,14 +5,14 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from palette_generator.color import delta_e_ok, hex_to_rgb
-from palette_generator.extract import (
+from palettengine.color import delta_e_ok, hex_to_rgb
+from palettengine.extract import (
     dominant_from_pixels,
     is_video_path,
     palette_from_pixels,
     pixels_from_frames,
 )
-from palette_generator.extract.quantize import kmeans, srgb_to_oklab
+from palettengine.extract.quantize import kmeans, srgb_to_oklab
 
 RNG = np.random.default_rng(0)
 
@@ -34,7 +34,7 @@ def _three_color_image() -> np.ndarray:
 # conversions & kmeans
 # --------------------------------------------------------------------------- #
 def test_srgb_to_oklab_matches_scalar_reference() -> None:
-    from palette_generator.color import rgb_to_oklab
+    from palettengine.color import rgb_to_oklab
 
     rgb = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.2, 0.4, 0.7]])
     got = srgb_to_oklab(rgb)
@@ -94,7 +94,7 @@ def test_faithful_extraction_recovers_source_colors() -> None:
 
 
 def test_all_extracted_colors_in_gamut() -> None:
-    from palette_generator.color import in_gamut
+    from palettengine.color import in_gamut
 
     for c in palette_from_pixels(_three_color_image(), size=6, seed=2):
         assert in_gamut(c.rgb)

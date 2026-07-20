@@ -33,7 +33,7 @@ describe("oklch conversions (Ottosson reference vectors)", () => {
   });
 
   it("matches the Python core for a known color", () => {
-    // #3b82f6 per palette_generator: oklch(0.6231, 0.1880, 259.81)
+    // #3b82f6 per palettengine: oklch(0.6231, 0.1880, 259.81)
     const c = hexToOklch("#3b82f6");
     expect(c.l).toBeCloseTo(0.6231, 3);
     expect(c.c).toBeCloseTo(0.188, 3);

@@ -8,7 +8,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from palette_generator.color import spaces as s
+from palettengine.color import spaces as s
 
 
 # --------------------------------------------------------------------------- #
