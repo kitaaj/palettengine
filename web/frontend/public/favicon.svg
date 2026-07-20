@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Two overlapping colors making a third: the palettengine mark. -->
+  <circle cx="12.5" cy="13" r="9.5" fill="#3b82f6"/>
+  <circle cx="19.5" cy="19" r="9.5" fill="#22c55e"/>
+  <clipPath id="lens"><circle cx="12.5" cy="13" r="9.5"/></clipPath>
+  <circle cx="19.5" cy="19" r="9.5" fill="#1aa3a3" clip-path="url(#lens)"/>
+</svg>
