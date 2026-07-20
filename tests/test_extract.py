@@ -100,6 +100,22 @@ def test_all_extracted_colors_in_gamut() -> None:
         assert in_gamut(c.rgb)
 
 
+def test_no_duplicate_colors_from_low_diversity_source() -> None:
+    # A two-tone image asked for 5 colors must still yield 5 distinct swatches
+    # (via merged clusters + synthesized tints/shades), not repeated hexes.
+    px = np.concatenate([_blob("#112a4a", 500), _blob("#ee6644", 500)])
+    for strategy in (palette_from_pixels, dominant_from_pixels):
+        pal = strategy(px, size=5, seed=1)
+        assert len(pal) == 5
+        assert len(set(pal.hexes())) == 5
+
+
+def test_single_color_source_yields_monochrome_ramp() -> None:
+    px = _blob("#3b82f6", 800)
+    pal = palette_from_pixels(px, size=5, seed=1)
+    assert len(set(pal.hexes())) == 5  # distinct tints/shades of one hue
+
+
 # --------------------------------------------------------------------------- #
 # video frame pooling
 # --------------------------------------------------------------------------- #
@@ -118,3 +134,27 @@ def test_pixels_from_frames_empty_raises() -> None:
 def test_is_video_path() -> None:
     assert is_video_path("clip.MP4")
     assert not is_video_path("photo.png")
+
+
+def test_extract_video_end_to_end(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Decode and extract from a real encoded video (skips if no ffmpeg backend)."""
+    imageio = pytest.importorskip("imageio")
+    from palettengine.extract import extract_video
+
+    # A clip with two steady color regions; 32px tall (divisible by 16) to avoid resize.
+    frames = []
+    for t in range(16):
+        f = np.zeros((32, 48, 3), dtype=np.uint8)
+        f[:, :24] = (40, 180, 170)
+        f[:, 24:] = (200, 40, min(255, 60 + t * 8))
+        frames.append(f)
+
+    path = tmp_path / "clip.mp4"
+    try:
+        imageio.mimsave(str(path), frames, fps=8)
+    except Exception as exc:  # ffmpeg plugin unavailable in this environment
+        pytest.skip(f"no video backend: {exc}")
+
+    pal = extract_video(str(path), size=4, seed=1)
+    assert len(pal) == 4
+    assert len(set(pal.hexes())) == 4  # distinct, not repeated

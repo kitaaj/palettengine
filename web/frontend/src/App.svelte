@@ -31,9 +31,10 @@
   let linkCopied = $state(false);
   let editorIndex = $state(-1);
 
-  // Extraction source (kept so the palette can be re-rolled from the same image).
+  // Extraction source (kept so the palette can be re-rolled from the same file).
   let sourceFile = $state<File | null>(null);
   let sourceThumb = $state("");
+  let sourceIsVideo = $state(false);
   let faithful = $state(false);
 
   // Undo/redo: snapshots of the visible palette state.
@@ -208,8 +209,10 @@
     if (!files?.length) return;
     const file = files[0];
     sourceFile = file;
+    sourceIsVideo = file.type.startsWith("video/") || /\.(mp4|mov|mkv|avi|webm|m4v)$/i.test(file.name);
     if (sourceThumb) URL.revokeObjectURL(sourceThumb);
-    sourceThumb = file.type.startsWith("image/") ? URL.createObjectURL(file) : "";
+    // Both images and videos get an object URL — the chip renders a <video> for clips.
+    sourceThumb = URL.createObjectURL(file);
     runExtract(file);
   }
 
@@ -390,7 +393,7 @@
         accept="image/*,video/*"
         onchange={(e) => onUpload((e.target as HTMLInputElement).files)}
       />
-      <span class="upload-btn"><Icon name="image" /> Extract from image</span>
+      <span class="upload-btn"><Icon name="image" /> Extract from image or video</span>
     </label>
     <button class="primary" onclick={doGenerate} disabled={busy}>
       <Icon name="refresh" />
@@ -404,12 +407,15 @@
 
   {#if sourceFile}
     <section class="source-chip">
-      {#if sourceThumb}
+      {#if sourceThumb && sourceIsVideo}
+        <!-- svelte-ignore a11y_media_has_caption -->
+        <video src={sourceThumb} muted autoplay loop playsinline></video>
+      {:else if sourceThumb}
         <img src={sourceThumb} alt="Extraction source" />
       {/if}
       <div class="source-meta">
         <span class="source-name">{sourceFile.name}</span>
-        <span class="source-hint">palette extracted from this {sourceThumb ? "image" : "file"}</span>
+        <span class="source-hint">palette extracted from this {sourceIsVideo ? "video" : "image"}</span>
       </div>
       <label class="faithful">
         <input type="checkbox" bind:checked={faithful} />
@@ -647,7 +653,8 @@
     padding: 0.55rem 0.8rem;
     box-shadow: var(--shadow-sm);
   }
-  .source-chip img {
+  .source-chip img,
+  .source-chip video {
     width: 44px;
     height: 44px;
     object-fit: cover;
