@@ -66,15 +66,18 @@ export async function generatePalette(opts: GenerateOptions): Promise<PalettePay
   );
 }
 
-export async function extractPalette(
-  file: File,
-  size: number,
-  faithful: boolean,
-): Promise<PalettePayload> {
+export interface ExtractOptions {
+  size?: number;
+  faithful?: boolean;
+  seed?: number;
+}
+
+export async function extractPalette(file: File, opts: ExtractOptions = {}): Promise<PalettePayload> {
   const form = new FormData();
   form.append("file", file);
-  form.append("size", String(size));
-  form.append("faithful", String(faithful));
+  form.append("size", String(opts.size ?? 5));
+  form.append("faithful", String(opts.faithful ?? false));
+  if (opts.seed !== undefined) form.append("seed", String(opts.seed));
   return jsonOrThrow(await fetch("/api/extract", { method: "POST", body: form }));
 }
 

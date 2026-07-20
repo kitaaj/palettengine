@@ -13,7 +13,8 @@
     display,
     textOn = [],
     onToggleLock,
-    onEdit,
+    onOpenEditor,
+    onReorder,
   }: {
     swatches: Swatch[];
     /** Hexes to actually paint (may be CVD-simulated versions). */
@@ -21,10 +22,13 @@
     /** Server-computed WCAG overlay colors; null entries fall back to the local estimate. */
     textOn?: (string | null)[];
     onToggleLock: (i: number) => void;
-    onEdit: (i: number, hex: string) => void;
+    onOpenEditor: (i: number) => void;
+    onReorder: (from: number, to: number) => void;
   } = $props();
 
   let copiedIndex = $state(-1);
+  let dragFrom = $state(-1);
+  let dragOver = $state(-1);
 
   /** Local fallback when no server value applies (e.g. mid-edit or CVD preview). */
   function estimateTextOn(hex: string): string {
@@ -46,6 +50,12 @@
       /* clipboard unavailable */
     }
   }
+
+  function drop(i: number) {
+    if (dragFrom >= 0 && dragFrom !== i) onReorder(dragFrom, i);
+    dragFrom = -1;
+    dragOver = -1;
+  }
 </script>
 
 <div class="row" role="list">
@@ -53,7 +63,29 @@
     <div
       class="swatch"
       class:locked={sw.locked}
+      class:drag-over={dragOver === i && dragFrom !== i}
       role="listitem"
+      draggable="true"
+      ondragstart={(e) => {
+        dragFrom = i;
+        e.dataTransfer?.setData("text/plain", String(i));
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+      }}
+      ondragover={(e) => {
+        e.preventDefault();
+        dragOver = i;
+      }}
+      ondragleave={() => {
+        if (dragOver === i) dragOver = -1;
+      }}
+      ondrop={(e) => {
+        e.preventDefault();
+        drop(i);
+      }}
+      ondragend={() => {
+        dragFrom = -1;
+        dragOver = -1;
+      }}
       style="background:{display[i] ?? sw.hex}; color:{overlayColor(i)}"
     >
       <div class="actions">
@@ -73,14 +105,14 @@
         >
           <Icon name={copiedIndex === i ? "check" : "copy"} />
         </button>
-        <label class="action" title="Edit color" aria-label="Edit color">
-          <Icon name="droplet" />
-          <input
-            type="color"
-            value={sw.hex}
-            oninput={(e) => onEdit(i, (e.target as HTMLInputElement).value)}
-          />
-        </label>
+        <button
+          class="action"
+          title="Edit in OKLCH"
+          aria-label="Edit color"
+          onclick={() => onOpenEditor(i)}
+        >
+          <Icon name="sliders" />
+        </button>
       </div>
       <span class="hex">{sw.hex}</span>
     </div>
@@ -99,7 +131,6 @@
     .row {
       flex-direction: column;
     }
-    .row :global(.swatch),
     .swatch {
       flex-direction: row;
       justify-content: space-between;
@@ -120,7 +151,16 @@
     justify-content: flex-end;
     gap: 0.55rem;
     padding: 1rem 0.4rem 1.1rem;
-    transition: flex-grow 160ms ease;
+    cursor: grab;
+    transition: filter 140ms ease;
+  }
+  .swatch:active {
+    cursor: grabbing;
+  }
+  .swatch.drag-over {
+    filter: brightness(1.12);
+    outline: 2px dashed rgb(127 127 127 / 0.6);
+    outline-offset: -6px;
   }
   .actions {
     display: flex;
@@ -155,12 +195,6 @@
   .action:hover {
     background: rgb(127 127 127 / 0.22);
     border: none;
-  }
-  .action input {
-    position: absolute;
-    width: 0;
-    height: 0;
-    opacity: 0;
   }
   .hex {
     font-family: ui-monospace, "Cascadia Code", Consolas, monospace;

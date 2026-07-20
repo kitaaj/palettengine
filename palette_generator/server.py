@@ -112,7 +112,7 @@ def _parse_hexes(hexes: list[str]) -> Palette:
 # app factory
 # --------------------------------------------------------------------------- #
 def create_app() -> FastAPI:
-    app = FastAPI(title="palette-generator", version="0.1.0")
+    app = FastAPI(title="palette-generator", version="0.2.0")
 
     @app.post("/api/generate")
     def api_generate(req: GenerateRequest) -> dict[str, Any]:

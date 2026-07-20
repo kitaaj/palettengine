@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 
 export default defineConfig({
@@ -12,4 +12,5 @@ export default defineConfig({
     },
   },
   build: { outDir: "dist" },
+  test: { environment: "node", include: ["src/**/*.test.ts"] },
 });

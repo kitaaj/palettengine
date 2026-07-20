@@ -11,6 +11,7 @@
   import ContrastGrid from "./lib/ContrastGrid.svelte";
   import ExportPanel from "./lib/ExportPanel.svelte";
   import Icon from "./lib/Icon.svelte";
+  import SwatchEditor from "./lib/SwatchEditor.svelte";
   import SwatchRow, { type Swatch } from "./lib/SwatchRow.svelte";
   import ThemePreview from "./lib/ThemePreview.svelte";
 
@@ -28,6 +29,22 @@
   let busy = $state(false);
   let error = $state("");
   let linkCopied = $state(false);
+  let editorIndex = $state(-1);
+
+  // Extraction source (kept so the palette can be re-rolled from the same image).
+  let sourceFile = $state<File | null>(null);
+  let sourceThumb = $state("");
+  let faithful = $state(false);
+
+  // Undo/redo: snapshots of the visible palette state.
+  interface Snapshot {
+    swatches: Swatch[];
+    payload: PalettePayload | null;
+  }
+  let past = $state<Snapshot[]>([]);
+  let future = $state<Snapshot[]>([]);
+  const canUndo = $derived(past.length > 0);
+  const canRedo = $derived(future.length > 0);
 
   type ThemeMode = "light" | "dark" | "system";
   let theme = $state<ThemeMode>((localStorage.getItem("theme") as ThemeMode) ?? "system");
@@ -99,6 +116,54 @@
     setTimeout(() => (linkCopied = false), 1100);
   }
 
+  // ---- history ----------------------------------------------------------
+  function pushHistory() {
+    if (!swatches.length) return;
+    past = [
+      ...past.slice(-49),
+      { swatches: $state.snapshot(swatches), payload: $state.snapshot(payload) },
+    ];
+    future = [];
+  }
+
+  function restoreSnapshot(s: Snapshot) {
+    swatches = s.swatches.map((x) => ({ ...x }));
+    payload = s.payload;
+    refreshSim();
+    syncUrl();
+  }
+
+  function undo() {
+    if (!canUndo) return;
+    future = [...future, { swatches: $state.snapshot(swatches), payload: $state.snapshot(payload) }];
+    const s = past[past.length - 1];
+    past = past.slice(0, -1);
+    restoreSnapshot(s);
+  }
+
+  function redo() {
+    if (!canRedo) return;
+    past = [...past, { swatches: $state.snapshot(swatches), payload: $state.snapshot(payload) }];
+    const s = future[future.length - 1];
+    future = future.slice(0, -1);
+    restoreSnapshot(s);
+  }
+
+  /**
+   * Refresh score/contrast/roles after a local change (edit, reorder) without
+   * altering the colors: an all-locked generate returns them exactly.
+   */
+  async function refreshPanels() {
+    const locks: Record<number, string> = Object.fromEntries(hexes.map((h, i) => [i, h]));
+    try {
+      payload = await generatePalette({ scheme, size: hexes.length, mode, locks, seed: 0 });
+    } catch {
+      /* panels go stale rather than erroring the whole app */
+    }
+    refreshSim();
+    syncUrl();
+  }
+
   async function refreshSim() {
     if (cvd === "none" || swatches.length === 0) return;
     try {
@@ -111,6 +176,7 @@
   async function doGenerate() {
     busy = true;
     error = "";
+    pushHistory();
     try {
       const locks: Record<number, string> = {};
       swatches.forEach((s, i) => {
@@ -125,12 +191,12 @@
     }
   }
 
-  async function onUpload(files: FileList | null) {
-    if (!files?.length) return;
+  async function runExtract(file: File, seed?: number) {
     busy = true;
     error = "";
+    pushHistory();
     try {
-      applyPayload(await extractPalette(files[0], size, false), false);
+      applyPayload(await extractPalette(file, { size, faithful, seed }), false);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -138,14 +204,46 @@
     }
   }
 
-  function toggleLock(i: number) {
-    swatches[i].locked = !swatches[i].locked;
+  function onUpload(files: FileList | null) {
+    if (!files?.length) return;
+    const file = files[0];
+    sourceFile = file;
+    if (sourceThumb) URL.revokeObjectURL(sourceThumb);
+    sourceThumb = file.type.startsWith("image/") ? URL.createObjectURL(file) : "";
+    runExtract(file);
   }
 
-  function editColor(i: number, hex: string) {
-    swatches[i].hex = hex;
-    swatches[i].locked = true; // editing implies intent to keep
-    refreshSim();
+  function reroll() {
+    if (sourceFile) runExtract(sourceFile, Math.floor(Math.random() * 1_000_000));
+  }
+
+  function clearSource() {
+    sourceFile = null;
+    if (sourceThumb) URL.revokeObjectURL(sourceThumb);
+    sourceThumb = "";
+  }
+
+  function toggleLock(i: number) {
+    swatches[i].locked = !swatches[i].locked;
+    syncUrl();
+  }
+
+  function applyEdit(hex: string) {
+    if (editorIndex < 0) return;
+    pushHistory();
+    swatches[editorIndex].hex = hex;
+    swatches[editorIndex].locked = true; // editing implies intent to keep
+    editorIndex = -1;
+    refreshPanels();
+  }
+
+  function reorder(from: number, to: number) {
+    pushHistory();
+    const arr = swatches.map((s) => ({ ...s }));
+    const [moved] = arr.splice(from, 1);
+    arr.splice(to, 0, moved);
+    swatches = arr;
+    refreshPanels();
   }
 
   function setCvd(kind: string) {
@@ -154,7 +252,15 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    if (e.code === "Space" && !(e.target instanceof HTMLInputElement)) {
+    if (editorIndex >= 0) return; // modal handles its own keys
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) {
+      e.preventDefault();
+      undo();
+    } else if ((mod && e.key.toLowerCase() === "y") || (mod && e.shiftKey && e.key.toLowerCase() === "z")) {
+      e.preventDefault();
+      redo();
+    } else if (e.code === "Space" && !(e.target instanceof HTMLInputElement)) {
       e.preventDefault();
       doGenerate();
     }
@@ -189,6 +295,24 @@
     </div>
     <div class="meta-links">
       <span class="hint"><kbd>Space</kbd> to generate</span>
+      <button
+        class="ghost"
+        onclick={undo}
+        disabled={!canUndo}
+        title="Undo (Ctrl+Z)"
+        aria-label="Undo"
+      >
+        <Icon name="undo" size={13} />
+      </button>
+      <button
+        class="ghost"
+        onclick={redo}
+        disabled={!canRedo}
+        title="Redo (Ctrl+Y)"
+        aria-label="Redo"
+      >
+        <Icon name="redo" size={13} />
+      </button>
       <button class="ghost" onclick={copyLink} title="Copy shareable link">
         <Icon name={linkCopied ? "check" : "link"} size={13} />
         {linkCopied ? "Copied" : "Share"}
@@ -278,8 +402,38 @@
     <p class="error" role="alert">{error}</p>
   {/if}
 
+  {#if sourceFile}
+    <section class="source-chip">
+      {#if sourceThumb}
+        <img src={sourceThumb} alt="Extraction source" />
+      {/if}
+      <div class="source-meta">
+        <span class="source-name">{sourceFile.name}</span>
+        <span class="source-hint">palette extracted from this {sourceThumb ? "image" : "file"}</span>
+      </div>
+      <label class="faithful">
+        <input type="checkbox" bind:checked={faithful} />
+        faithful
+      </label>
+      <button onclick={reroll} disabled={busy} title="Extract a different palette from the same source">
+        <Icon name="refresh" size={13} />
+        Re-roll
+      </button>
+      <button class="ghost" onclick={clearSource} title="Dismiss source" aria-label="Dismiss source">
+        <Icon name="x" size={13} />
+      </button>
+    </section>
+  {/if}
+
   {#if swatches.length}
-    <SwatchRow {swatches} {display} {textOn} onToggleLock={toggleLock} onEdit={editColor} />
+    <SwatchRow
+      {swatches}
+      {display}
+      {textOn}
+      onToggleLock={toggleLock}
+      onOpenEditor={(i) => (editorIndex = i)}
+      onReorder={reorder}
+    />
 
     <section class="cvd">
       <span class="cvd-label"><Icon name="eye" size={14} /> Vision</span>
@@ -322,6 +476,14 @@
         </section>
       </div>
     {/if}
+  {/if}
+
+  {#if editorIndex >= 0 && swatches[editorIndex]}
+    <SwatchEditor
+      hex={swatches[editorIndex].hex}
+      onApply={applyEdit}
+      onClose={() => (editorIndex = -1)}
+    />
   {/if}
 </main>
 
@@ -472,6 +634,50 @@
   .error {
     color: var(--danger);
     margin: 0;
+  }
+
+  /* ---- extraction source chip ---- */
+  .source-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.55rem 0.8rem;
+    box-shadow: var(--shadow-sm);
+  }
+  .source-chip img {
+    width: 44px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+  }
+  .source-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+  }
+  .source-name {
+    font-size: 0.84rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .source-hint {
+    font-size: 0.74rem;
+    color: var(--muted);
+  }
+  .faithful {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    cursor: pointer;
   }
 
   /* ---- cvd row ---- */

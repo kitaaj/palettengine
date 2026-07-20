@@ -1,67 +1,92 @@
 # palette-generator
 
 A perceptual, accessible color palette generator — a self-contained, improved take on
-[Colormind](https://colormind.io). All color reasoning happens in **OKLab/OKLCH** (perceptually
-uniform), generation is **deterministic and seedable**, and palettes are **accessible by
-construction** (WCAG contrast, colorblind-aware).
+[Colormind](https://colormind.io). All color reasoning happens in **OKLab/OKLCH**
+(perceptually uniform), generation is **deterministic and seedable**, and palettes are
+**accessible by construction**.
 
-See [PLAN.md](PLAN.md) for the full design and roadmap.
+## Why it's better than the tools it's inspired by
 
-## Status
+| | palette-generator | typical generators |
+|---|---|---|
+| Color space | OKLCH (perceptually uniform) | RGB / HSL |
+| Locks | **Hard** — locked colors return exactly | often drift |
+| Palette size | 1–12 colors | fixed 5 |
+| Reproducibility | seeded, deterministic | server RNG |
+| Accessibility | WCAG contrast matrix, auto-fix, colorblind sim | none |
+| Semantics | role assignment (bg/surface/text/primary/…) | anonymous swatches |
+| Exports | CSS, SCSS, Tailwind, W3C tokens, JSON, SVG, GPL, ASE | copy hex |
+| Explainability | transparent, tunable quality score | black box |
 
-Early development. Done: **Phase 0–4** — color foundation, generation engine + CLI,
-accessibility (WCAG auto-fix + colorblind sim), semantic roles, exporters,
-image/video extraction, and a **web UI + JSON API** (with Colormind-compatible
-endpoints). Next: optional ML scoring layer.
+## Install
 
-## Layout
-
+```bash
+python -m pip install -e ".[dev,image,web]"   # library + extraction + server
+cd web/frontend && npm install && npm run build
 ```
-palette_generator/     # the library
-  color/               # sRGB / linear / OKLab / OKLCH / HSL / hex, contrast, ΔE
-  harmony/             # color-theory schemes
-  generate/            # deterministic engine + transparent quality scorer
-  accessibility/       # WCAG auto-fix, colorblind (CVD) simulation
-  roles/               # semantic role assignment (primary/bg/text/…)
-  export/              # JSON / CSS / SCSS / Tailwind / tokens / SVG / GPL / ASE
-  extract/             # image/video -> palette (perceptual k-means + scorer)
-  cli.py               # `palette generate` / `palette extract` / `palette serve`
-  server.py            # FastAPI JSON API + static UI + Colormind-compatible shims
-web/frontend/          # Svelte 5 + Vite SPA (swatches, locks, contrast grid, CVD, export)
-tests/                 # pytest + hypothesis
+
+## CLI
+
+```bash
+palette generate --seed 42                             # reproducible palette
+palette generate --base '#3b82f6' --scheme triadic --explain
+palette generate --mode ui --roles light --export css > theme.css
+palette generate --seed 7 --simulate deutan            # colorblind preview
+
+palette extract photo.jpg --seed 1 --explain           # best-scoring palette from an image
+palette extract clip.mp4 --mode ui --roles dark --export tokens
+
+palette serve                                          # web UI + API at :8710
 ```
 
 ## Web UI
 
-```bash
-cd web/frontend && npm install && npm run build   # once
-palette serve                                     # http://127.0.0.1:8710
+`palette serve` → http://127.0.0.1:8710
+
+- Swatch editing with **hard locks**, drag-to-reorder, per-swatch **OKLCH sliders**
+- `Space` to generate, `Ctrl+Z`/`Ctrl+Y` undo/redo, **shareable URLs**
+- Image/video extraction with source preview and **re-roll**
+- **WCAG contrast grid**, colorblind preview, light/dark **theme previews** from roles
+- Export panel (all formats, copy or download), light/dark/system app theme
+
+## JSON API
+
+OpenAPI docs at `/docs`. Highlights:
+
+- `POST /api/generate` — `{scheme, size, locks, seed, mode}` → colors (+ `text_on`),
+  score breakdown, contrast matrix, light/dark role maps
+- `POST /api/extract` — multipart image/video upload → same payload
+- `POST /api/export`, `POST /api/simulate`, `GET /api/meta`
+- **Colormind-compatible**: `POST /api/` and `GET /list/` accept existing Colormind
+  clients unchanged — with hard locks
+
+## Architecture
+
+```
+palette_generator/
+  color/           # sRGB / linear / OKLab / OKLCH / HSL / hex, WCAG contrast, ΔE
+  harmony/         # 7 color-theory schemes + seeded auto
+  generate/        # deterministic engine + transparent quality scorer
+  accessibility/   # WCAG auto-fix, colorblind (CVD) simulation
+  roles/           # semantic role assignment
+  export/          # 8 output formats (incl. binary ASE)
+  extract/         # image/video -> palette (perceptual k-means + shared scorer)
+  cli.py           # palette generate / extract / serve
+  server.py        # FastAPI JSON API + static UI + Colormind shims
+web/frontend/      # Svelte 5 + Vite + TS SPA
+tests/             # pytest + hypothesis (backend), vitest (frontend color math)
 ```
 
-The JSON API lives under `/api/*` (see `/docs` for OpenAPI). Colormind clients work
-as-is against `POST /api/` and `GET /list/` — with the improvement that locked input
-colors are returned exactly.
+Design notes in [PLAN.md](PLAN.md).
 
-## Examples
+## Development
 
 ```bash
-palette generate --seed 42                       # reproducible palette
-palette generate --base '#3b82f6' --scheme triadic --explain
-palette generate --mode ui --roles light --export css > theme.css
-palette generate --seed 7 --simulate deutan      # colorblind preview
-
-palette extract photo.jpg --seed 1 --explain     # best-scoring palette from an image
-palette extract photo.jpg --faithful             # most representative colors
-palette extract clip.mp4 --mode ui --roles dark --export tokens
-```
-
-Image/video extraction needs the extras: `pip install -e ".[image]"` (add `imageio` for video).
-
-## Install (dev)
-
-```bash
-python -m pip install -e ".[dev]"
-pytest
+./.venv/Scripts/python -m pytest          # backend: 121 tests
+./.venv/Scripts/python -m ruff check .    # lint
+./.venv/Scripts/python -m mypy palette_generator
+cd web/frontend && npm test               # frontend color math vs. reference vectors
+cd web/frontend && npm run dev            # Vite dev server (proxies /api to :8710)
 ```
 
 ## License
