@@ -1,0 +1,6 @@
+# Duplicate of the root requirements.txt, colocated with the function entrypoint.
+# Vercel's Python builder looks here in some configurations; keeping both covers it.
+fastapi>=0.110
+python-multipart>=0.0.9
+numpy>=1.26
+Pillow>=10.0
