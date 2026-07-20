@@ -9,6 +9,20 @@ from the CDN, and the FastAPI backend runs as a Python serverless function.
   shims, and the OpenAPI docs at `/docs` — all fast and cheap (pure Python, no heavy deps).
 - **Image** extraction (numpy + Pillow).
 
+## Rate limiting
+
+The API is public and unauthenticated by design (no user data, and the Colormind-compatible
+shim is meant to be curled directly). To keep it from becoming a cost/abuse vector on Vercel's
+metered serverless model, requests are throttled per IP: a generous global default (120/min),
+tighter caps on the expensive/abuse-prone routes (`/api/extract` 10/min, `/api/generate` and the
+`/api/` shim 30/min each), and an explicit 8MB upload cap on `/api/extract` independent of
+Vercel's own body-size limit. Exceeding a limit returns `429`.
+
+Counters are in-process, not backed by a shared store, so on serverless they're per warm
+instance rather than a single global count — a real deterrent against naive scripted abuse, not
+a hard guarantee against a distributed attacker. If that gap ever matters, swap the limiter's
+storage for Redis (e.g. Upstash, which has a Vercel-native free tier).
+
 ## What does not (by design)
 
 - **Video extraction** is disabled. Serverless functions can't run ffmpeg reliably and cap

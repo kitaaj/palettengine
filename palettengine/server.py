@@ -23,6 +23,10 @@ from typing import Annotated, Any, Literal
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 
 from .accessibility import CVD_KINDS, contrast_matrix, simulate_palette
 from .color import contrast_ratio
@@ -37,6 +41,10 @@ from .roles import ROLE_ORDER, assign_roles
 __all__ = ["app", "create_app"]
 
 _HEX = r"^#?[0-9a-fA-F]{6}$|^#?[0-9a-fA-F]{3}$"
+
+# Max upload accepted by /api/extract, independent of any platform-level cap (Vercel's
+# is ~4.5MB; this is a portable, explicit guard for self-hosted deployments too).
+_MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 
 
 def _video_enabled() -> bool:
@@ -124,8 +132,27 @@ def _parse_hexes(hexes: list[str]) -> Palette:
 def create_app() -> FastAPI:
     app = FastAPI(title="palettengine", version="0.2.0")
 
+    # Per-IP request limiting: a generous global default plus tighter caps on the
+    # expensive/abuse-prone routes (image extraction, generation, the Colormind shim).
+    # Created fresh per app instance — sharing one limiter across multiple create_app()
+    # calls (e.g. the module-level app plus a test's own instance) double-registers
+    # each route against it and silently halves the effective limit.
+    #
+    # Note: on serverless (Vercel), counters live in-process, not in a shared store —
+    # this is a best-effort deterrent against naive scripted abuse, not a hard
+    # guarantee under a distributed attack. A shared store (e.g. Redis) would close
+    # that gap if it's ever needed.
+    limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
+    app.state.limiter = limiter
+    # slowapi's handler is typed for RateLimitExceeded specifically, narrower than the
+    # generic Exception signature add_exception_handler expects; the mismatch is a
+    # known slowapi/Starlette stub gap, not a real type error.
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+    app.add_middleware(SlowAPIMiddleware)
+
     @app.post("/api/generate")
-    def api_generate(req: GenerateRequest) -> dict[str, Any]:
+    @limiter.limit("30/minute")
+    def api_generate(request: Request, req: GenerateRequest) -> dict[str, Any]:
         try:
             palette = generate(
                 base=req.base,
@@ -141,7 +168,9 @@ def create_app() -> FastAPI:
         return _palette_payload(palette, req.mode)
 
     @app.post("/api/extract")
+    @limiter.limit("10/minute")
     async def api_extract(
+        request: Request,
         file: Annotated[UploadFile, File()],
         size: Annotated[int, Form()] = 5,
         seed: Annotated[int | None, Form()] = None,
@@ -164,6 +193,11 @@ def create_app() -> FastAPI:
         data = await file.read()
         if not data:
             raise HTTPException(status_code=422, detail="empty upload")
+        if len(data) > _MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"upload exceeds the {_MAX_UPLOAD_BYTES // (1024 * 1024)}MB limit",
+            )
         # extract_* take paths, so buffer the upload to a temp file.
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(data)
@@ -214,6 +248,7 @@ def create_app() -> FastAPI:
     # Colormind-compatible shims: POST /api/ and GET /list/
     # ------------------------------------------------------------------ #
     @app.post("/api/")
+    @limiter.limit("30/minute")
     async def colormind_api(request: Request) -> dict[str, Any]:
         # Colormind clients send raw JSON without a Content-Type header
         # (`curl --data-binary`), so parse the body ourselves.

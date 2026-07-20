@@ -200,3 +200,72 @@ def test_colormind_compat_garbage_body_422(client: TestClient) -> None:
 
 def test_colormind_list(client: TestClient) -> None:
     assert client.get("/list/").json() == {"result": ["default", "ui"]}
+
+
+# --------------------------------------------------------------------------- #
+# rate limiting
+#
+# Each test below builds its own TestClient(create_app()): the limiter is created
+# fresh inside create_app() (see server.py), so a new app instance always starts
+# with untouched counters — these tests are isolated from the shared `client`
+# fixture and from each other, regardless of call order or how many other tests run.
+# --------------------------------------------------------------------------- #
+def test_extract_rate_limit_kicks_in(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PALETTENGINE_NO_VIDEO", "1")
+    c = TestClient(create_app())
+    payload = _png_bytes()
+    codes = [
+        c.post(
+            "/api/extract",
+            files={"file": ("t.png", payload, "image/png")},
+            data={"size": "3", "faithful": "true"},
+        ).status_code
+        for _ in range(11)
+    ]
+    assert codes.count(200) == 10
+    assert codes[-1] == 429
+
+
+def test_generate_rate_limit_kicks_in() -> None:
+    c = TestClient(create_app())
+    codes = [c.post("/api/generate", json={"seed": 1, "size": 3}).status_code for _ in range(31)]
+    assert codes.count(200) == 30
+    assert codes[-1] == 429
+
+
+def test_meta_is_not_tightly_rate_limited(client: TestClient) -> None:
+    # /api/meta has no per-route limit, only the generous global default: calling it
+    # more than the extract/generate thresholds should never 429 on its own.
+    codes = [client.get("/api/meta").status_code for _ in range(15)]
+    assert all(c == 200 for c in codes)
+
+
+def test_extract_rejects_oversized_upload() -> None:
+    from palettengine.server import _MAX_UPLOAD_BYTES
+
+    c = TestClient(create_app())
+    huge = b"x" * (_MAX_UPLOAD_BYTES + 1)
+    r = c.post("/api/extract", files={"file": ("big.png", huge, "image/png")})
+    assert r.status_code == 413
+
+
+def test_rate_limit_is_isolated_per_app_instance() -> None:
+    # Regression guard: creating a second app must not inherit the first's counters
+    # (a shared module-level limiter previously caused exactly this kind of bleed).
+    a = TestClient(create_app())
+    b = TestClient(create_app())
+    payload = _png_bytes()
+
+    def extract(c: TestClient) -> int:
+        return c.post(
+            "/api/extract",
+            files={"file": ("t.png", payload, "image/png")},
+            data={"size": "3", "faithful": "true"},
+        ).status_code
+
+    # Exhaust `a`'s 10/minute extract budget.
+    for _ in range(10):
+        assert extract(a) == 200
+    assert extract(a) == 429
+    # `b` must still have its own untouched budget.
+    assert extract(b) == 200
