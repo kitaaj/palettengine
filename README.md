@@ -46,6 +46,8 @@ palette serve                                          # web UI + API at :8710
 - Swatch editing with **hard locks**, drag-to-reorder, per-swatch **OKLCH sliders**
 - `Space` to generate, `Ctrl+Z`/`Ctrl+Y` undo/redo, **shareable URLs**
 - Image/video extraction with source preview and **re-roll**
+- **Ambient mode** for videos: a live, glowing palette that follows playback in real
+  time (fully client-side; GPU-blurred glow, warm-started OKLab k-means on a 32×18 frame)
 - **WCAG contrast grid**, colorblind preview, light/dark **theme previews** from roles
 - Export panel (all formats, copy or download), light/dark/system app theme
 

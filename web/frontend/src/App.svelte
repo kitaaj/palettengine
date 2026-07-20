@@ -8,6 +8,7 @@
     type Meta,
     type PalettePayload,
   } from "./lib/api";
+  import AmbientPlayer from "./lib/AmbientPlayer.svelte";
   import ContrastGrid from "./lib/ContrastGrid.svelte";
   import ExportPanel from "./lib/ExportPanel.svelte";
   import Icon from "./lib/Icon.svelte";
@@ -36,6 +37,7 @@
   let sourceThumb = $state("");
   let sourceIsVideo = $state(false);
   let faithful = $state(false);
+  let ambientOpen = $state(false);
 
   // Undo/redo: snapshots of the visible palette state.
   interface Snapshot {
@@ -224,6 +226,15 @@
     sourceFile = null;
     if (sourceThumb) URL.revokeObjectURL(sourceThumb);
     sourceThumb = "";
+    ambientOpen = false;
+  }
+
+  function applyLivePalette(hx: string[]) {
+    pushHistory();
+    swatches = hx.map((hex) => ({ hex, locked: false }));
+    size = hx.length;
+    ambientOpen = false;
+    refreshPanels();
   }
 
   function toggleLock(i: number) {
@@ -421,6 +432,12 @@
         <input type="checkbox" bind:checked={faithful} />
         faithful
       </label>
+      {#if sourceIsVideo}
+        <button onclick={() => (ambientOpen = true)} title="Live palette that follows playback">
+          <Icon name="film" size={13} />
+          Ambient
+        </button>
+      {/if}
       <button onclick={reroll} disabled={busy} title="Extract a different palette from the same source">
         <Icon name="refresh" size={13} />
         Re-roll
@@ -490,6 +507,10 @@
       onApply={applyEdit}
       onClose={() => (editorIndex = -1)}
     />
+  {/if}
+
+  {#if ambientOpen && sourceFile}
+    <AmbientPlayer file={sourceFile} onApply={applyLivePalette} onClose={() => (ambientOpen = false)} />
   {/if}
 </main>
 
