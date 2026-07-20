@@ -149,6 +149,24 @@ def test_meta(client: TestClient) -> None:
     assert "auto" in doc["schemes"]
     assert "ase" in doc["formats"]
     assert "deutan" in doc["cvd_kinds"]
+    assert doc["video"] is True  # video enabled by default
+
+
+def test_video_can_be_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Serverless deployments set PALETTENGINE_NO_VIDEO=1: meta reports image-only
+    # and a video upload is rejected with 415 rather than crashing.
+    monkeypatch.setenv("PALETTENGINE_NO_VIDEO", "1")
+    c = TestClient(create_app())
+    assert c.get("/api/meta").json()["video"] is False
+    r = c.post("/api/extract", files={"file": ("clip.mp4", b"not-a-real-video", "video/mp4")})
+    assert r.status_code == 415
+    # Images still work with video disabled.
+    r2 = c.post(
+        "/api/extract",
+        files={"file": ("test.png", _png_bytes(), "image/png")},
+        data={"size": "3", "seed": "1", "faithful": "true"},
+    )
+    assert r2.status_code == 200
 
 
 def test_colormind_compat_random(client: TestClient) -> None:

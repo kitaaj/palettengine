@@ -52,6 +52,8 @@
 
   const hexes = $derived(swatches.map((s) => s.hex));
   const display = $derived(cvd === "none" ? hexes : simulated);
+  // Video extraction is unavailable on serverless deployments (meta.video === false).
+  const videoOk = $derived(meta?.video !== false);
   // Server-computed WCAG overlay colors; only valid while the swatch still matches
   // the payload (a local edit or CVD preview falls back to the client estimate).
   const textOn = $derived(
@@ -390,10 +392,12 @@
     <label class="upload">
       <input
         type="file"
-        accept="image/*,video/*"
+        accept={videoOk ? "image/*,video/*" : "image/*"}
         onchange={(e) => onUpload((e.target as HTMLInputElement).files)}
       />
-      <span class="upload-btn"><Icon name="image" /> Extract from image or video</span>
+      <span class="upload-btn">
+        <Icon name="image" /> Extract from image{videoOk ? " or video" : ""}
+      </span>
     </label>
     <button class="primary" onclick={doGenerate} disabled={busy}>
       <Icon name="refresh" />

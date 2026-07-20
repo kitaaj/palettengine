@@ -21,6 +21,8 @@ export interface Meta {
   cvd_kinds: string[];
   roles: string[];
   modes: string[];
+  /** Whether this deployment can extract from video (false on serverless/Vercel). */
+  video?: boolean;
 }
 
 export interface GenerateOptions {

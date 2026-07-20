@@ -1,0 +1,6 @@
+# Runtime deps for the Vercel serverless API (image-only; no imageio/ffmpeg).
+# The palettengine package itself is bundled from source via vercel.json includeFiles.
+fastapi>=0.110
+python-multipart>=0.0.9
+numpy>=1.26
+Pillow>=10.0

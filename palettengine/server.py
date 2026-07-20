@@ -15,6 +15,7 @@ Run with ``palette serve`` or ``uvicorn palettengine.server:app``.
 
 from __future__ import annotations
 
+import os
 import tempfile
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -36,6 +37,15 @@ from .roles import ROLE_ORDER, assign_roles
 __all__ = ["app", "create_app"]
 
 _HEX = r"^#?[0-9a-fA-F]{6}$|^#?[0-9a-fA-F]{3}$"
+
+
+def _video_enabled() -> bool:
+    """Video extraction needs ffmpeg + large uploads, which serverless can't provide.
+
+    Deployments that can't support it (e.g. Vercel) set ``PALETTENGINE_NO_VIDEO=1`` so
+    the API advertises image-only and rejects video cleanly instead of crashing.
+    """
+    return os.getenv("PALETTENGINE_NO_VIDEO", "") == ""
 
 
 # --------------------------------------------------------------------------- #
@@ -146,6 +156,11 @@ def create_app() -> FastAPI:
             ) from exc
 
         suffix = Path(file.filename or "upload.png").suffix or ".png"
+        if ex.is_video_path(suffix) and not _video_enabled():
+            raise HTTPException(
+                status_code=415,
+                detail="video extraction is not available on this deployment; upload an image",
+            )
         data = await file.read()
         if not data:
             raise HTTPException(status_code=422, detail="empty upload")
@@ -192,6 +207,7 @@ def create_app() -> FastAPI:
             "cvd_kinds": list(CVD_KINDS),
             "roles": list(ROLE_ORDER),
             "modes": ["general", "ui"],
+            "video": _video_enabled(),
         }
 
     # ------------------------------------------------------------------ #

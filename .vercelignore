@@ -1,0 +1,12 @@
+.venv
+.git
+tests
+web/frontend/node_modules
+web/frontend/dist
+.dist
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.hypothesis
+__pycache__
+PLAN.md
