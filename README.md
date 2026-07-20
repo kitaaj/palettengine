@@ -1,5 +1,8 @@
 # palettengine
 
+[![CI](https://github.com/kitaaj/palettengine/actions/workflows/ci.yml/badge.svg)](https://github.com/kitaaj/palettengine/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A perceptual, accessible color palette generator — a self-contained, improved take on
 [Colormind](https://colormind.io). All color reasoning happens in **OKLab/OKLCH**
 (perceptually uniform), generation is **deterministic and seedable**, and palettes are
