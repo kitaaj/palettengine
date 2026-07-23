@@ -91,10 +91,29 @@
     return name.replace(/\.[^.]+$/, "") || "palette";
   }
 
-  // Longest edge of the exported PNG. 7680 = 8K.
-  const EXPORT_WIDTH = 7680;
+  // Hard ceiling on the exported width (8K). We never upscale past the source
+  // image's own resolution, so a small photo exports small; this only caps
+  // genuinely huge originals.
+  const MAX_WIDTH = 7680;
+  // WebP at this quality is visually lossless for photos at a fraction of PNG's size.
+  const QUALITY = 0.92;
 
-  /** Render the card (image above, palette strip below) to an 8K PNG and download it. */
+  /** Encode the canvas, preferring WebP, then JPEG, then PNG (whatever the browser supports). */
+  async function encode(canvas: HTMLCanvasElement): Promise<{ blob: Blob; ext: string } | null> {
+    for (const [type, ext] of [
+      ["image/webp", "webp"],
+      ["image/jpeg", "jpg"],
+      ["image/png", "png"],
+    ] as const) {
+      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, type, QUALITY));
+      // A browser that can't produce `type` silently falls back to PNG; the
+      // type check confirms we actually got the format we asked for.
+      if (blob && blob.type === type) return { blob, ext };
+    }
+    return null;
+  }
+
+  /** Render the card (image above, palette strip below) and download it as a compressed image. */
   async function downloadCard(card: Card) {
     if (!card.colors.length) return;
     const img = new Image();
@@ -105,7 +124,8 @@
       /* draw whatever decoded; a broken image just yields the strip */
     }
 
-    const w = EXPORT_WIDTH;
+    // Match the source resolution (no upscaling), capped at 8K.
+    const w = Math.min(MAX_WIDTH, img.naturalWidth || 2000);
     const aspect = img.naturalWidth ? img.naturalHeight / img.naturalWidth : 0.625;
     const imgH = img.naturalWidth ? Math.round(w * aspect) : 0;
     const stripH = Math.round(w * 0.12);
@@ -128,11 +148,11 @@
       ctx.fillRect(Math.floor(i * bw), imgH, Math.ceil(bw) + 1, stripH);
     });
 
-    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
-    if (!blob) return;
+    const out = await encode(canvas);
+    if (!out) return;
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${baseName(card.name)}-palette.png`;
+    a.href = URL.createObjectURL(out.blob);
+    a.download = `${baseName(card.name)}-palette.${out.ext}`;
     a.click();
     URL.revokeObjectURL(a.href);
   }
@@ -215,7 +235,7 @@
               <button
                 class="ghost"
                 disabled={!card.colors.length}
-                title="Download card as an 8K image"
+                title="Download card as an image"
                 aria-label="Download card as image"
                 onclick={() => downloadCard(card)}
               >
