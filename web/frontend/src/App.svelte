@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
-    extractPalette,
     fetchMeta,
     generatePalette,
     simulatePalette,
@@ -13,7 +12,7 @@
   import Icon from "./lib/Icon.svelte";
   import SwatchEditor from "./lib/SwatchEditor.svelte";
   import SwatchRow, { type Swatch } from "./lib/SwatchRow.svelte";
-  import ThemePreview from "./lib/ThemePreview.svelte";
+  import UploadGallery from "./lib/UploadGallery.svelte";
 
   let meta = $state<Meta | null>(null);
   let swatches = $state<Swatch[]>([]);
@@ -31,12 +30,6 @@
   let linkCopied = $state(false);
   let editorIndex = $state(-1);
 
-  // Extraction source (kept so the palette can be re-rolled from the same file).
-  let sourceFile = $state<File | null>(null);
-  let sourceThumb = $state("");
-  let sourceIsVideo = $state(false);
-  let faithful = $state(false);
-
   // Undo/redo: snapshots of the visible palette state.
   interface Snapshot {
     swatches: Swatch[];
@@ -52,8 +45,6 @@
 
   const hexes = $derived(swatches.map((s) => s.hex));
   const display = $derived(cvd === "none" ? hexes : simulated);
-  // Video extraction is unavailable on serverless deployments (meta.video === false).
-  const videoOk = $derived(meta?.video !== false);
   // Server-computed WCAG overlay colors; only valid while the swatch still matches
   // the payload (a local edit or CVD preview falls back to the client estimate).
   const textOn = $derived(
@@ -194,38 +185,22 @@
     }
   }
 
-  async function runExtract(file: File, seed?: number) {
+  /** Load an explicit set of colors (e.g. from a gallery card) into the editor. */
+  async function loadColors(hx: string[]) {
+    if (!hx.length) return;
     busy = true;
     error = "";
     pushHistory();
     try {
-      applyPayload(await extractPalette(file, { size, faithful, seed }), false);
+      size = hx.length;
+      const locks: Record<number, string> = Object.fromEntries(hx.map((h, i) => [i, h]));
+      applyPayload(await generatePalette({ scheme, size, mode, locks, seed: 0 }), false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
       busy = false;
     }
-  }
-
-  function onUpload(files: FileList | null) {
-    if (!files?.length) return;
-    const file = files[0];
-    sourceFile = file;
-    sourceIsVideo = file.type.startsWith("video/") || /\.(mp4|mov|mkv|avi|webm|m4v)$/i.test(file.name);
-    if (sourceThumb) URL.revokeObjectURL(sourceThumb);
-    // Both images and videos get an object URL — the chip renders a <video> for clips.
-    sourceThumb = URL.createObjectURL(file);
-    runExtract(file);
-  }
-
-  function reroll() {
-    if (sourceFile) runExtract(sourceFile, Math.floor(Math.random() * 1_000_000));
-  }
-
-  function clearSource() {
-    sourceFile = null;
-    if (sourceThumb) URL.revokeObjectURL(sourceThumb);
-    sourceThumb = "";
   }
 
   function toggleLock(i: number) {
@@ -348,19 +323,16 @@
           <Icon name="moon" size={13} />
         </button>
       </div>
-      <a href="/docs" target="_blank" rel="noreferrer">
-        API
-        <Icon name="external-link" size={12} />
-      </a>
     </div>
   </header>
 
+  
   <section class="toolbar">
     <label>
       <span class="label">Scheme</span>
       <select bind:value={scheme}>
         {#each meta?.schemes ?? ["auto"] as s (s)}
-          <option value={s}>{s.replaceAll("_", " ")}</option>
+        <option value={s}>{s.replaceAll("_", " ")}</option>
         {/each}
       </select>
     </label>
@@ -372,7 +344,7 @@
       <span class="label">Mode</span>
       <div class="segmented" role="group" aria-label="Generation mode">
         {#each meta?.modes ?? ["general", "ui"] as m (m)}
-          <button
+        <button
             class:active={mode === m}
             onclick={() => {
               mode = m;
@@ -381,61 +353,25 @@
           >
             {m}
           </button>
-        {/each}
+          {/each}
+        </div>
       </div>
-    </div>
-    <label>
-      <span class="label">Seed</span>
-      <input type="text" placeholder="random" bind:value={seedText} />
-    </label>
-    <div class="spacer"></div>
-    <label class="upload">
-      <input
-        type="file"
-        accept={videoOk ? "image/*,video/*" : "image/*"}
-        onchange={(e) => onUpload((e.target as HTMLInputElement).files)}
-      />
-      <span class="upload-btn">
-        <Icon name="image" /> Extract from image{videoOk ? " or video" : ""}
-      </span>
-    </label>
-    <button class="primary" onclick={doGenerate} disabled={busy}>
-      <Icon name="refresh" />
-      Generate
-    </button>
-  </section>
-
-  {#if error}
-    <p class="error" role="alert">{error}</p>
-  {/if}
-
-  {#if sourceFile}
-    <section class="source-chip">
-      {#if sourceThumb && sourceIsVideo}
-        <!-- svelte-ignore a11y_media_has_caption -->
-        <video src={sourceThumb} muted autoplay loop playsinline></video>
-      {:else if sourceThumb}
-        <img src={sourceThumb} alt="Extraction source" />
-      {/if}
-      <div class="source-meta">
-        <span class="source-name">{sourceFile.name}</span>
-        <span class="source-hint">palette extracted from this {sourceIsVideo ? "video" : "image"}</span>
-      </div>
-      <label class="faithful">
-        <input type="checkbox" bind:checked={faithful} />
-        faithful
+      <label>
+        <span class="label">Seed</span>
+        <input type="text" placeholder="random" bind:value={seedText} />
       </label>
-      <button onclick={reroll} disabled={busy} title="Extract a different palette from the same source">
-        <Icon name="refresh" size={13} />
-        Re-roll
-      </button>
-      <button class="ghost" onclick={clearSource} title="Dismiss source" aria-label="Dismiss source">
-        <Icon name="x" size={13} />
+      <div class="spacer"></div>
+      <button class="primary" onclick={doGenerate} disabled={busy}>
+        <Icon name="refresh" />
+        Generate
       </button>
     </section>
-  {/if}
-
-  {#if swatches.length}
+    
+    {#if error}
+    <p class="error" role="alert">{error}</p>
+    {/if}
+    
+    {#if swatches.length}
     <SwatchRow
       {swatches}
       {display}
@@ -445,14 +381,22 @@
       onReorder={reorder}
     />
 
-    <section class="cvd">
-      <span class="cvd-label"><Icon name="eye" size={14} /> Vision</span>
-      <div class="segmented" role="group" aria-label="Color vision simulation">
-        {#each ["none", ...(meta?.cvd_kinds ?? [])] as kind (kind)}
-          <button class:active={cvd === kind} onclick={() => setCvd(kind)}>{kind}</button>
-        {/each}
-      </div>
-    </section>
+<section class="cvd">
+  <span class="cvd-label"><Icon name="eye" size={14} /> Vision</span>
+  <div class="segmented" role="group" aria-label="Color vision simulation">
+    {#each ["none", ...(meta?.cvd_kinds ?? [])] as kind (kind)}
+    <button class:active={cvd === kind} onclick={() => setCvd(kind)}>{kind}</button>
+    {/each}
+  </div>
+</section>
+<section class="card gallery-card">
+  <h2>Extract from your images</h2>
+  <p class="gallery-note">
+    Upload photos, screenshots, or artwork. Each lands in a card with its palette attached
+    below, ready to copy or load into the editor.
+  </p>
+  <UploadGallery {size} onSend={loadColors} />
+</section>
 
     {#if payload}
       <div class="grid2">
@@ -470,14 +414,6 @@
         <section class="card">
           <h2>Contrast</h2>
           <ContrastGrid {hexes} matrix={payload.contrast} />
-        </section>
-
-        <section class="card">
-          <h2>Themes</h2>
-          <div class="themes">
-            <ThemePreview roles={payload.roles.light} theme="light" />
-            <ThemePreview roles={payload.roles.dark} theme="dark" />
-          </div>
         </section>
 
         <section class="card">
@@ -546,16 +482,6 @@
     font-family: inherit;
     background: var(--surface);
   }
-  .meta-links a {
-    color: var(--muted);
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-  }
-  .meta-links a:hover {
-    color: var(--accent);
-  }
   .meta-links .segmented button {
     padding: 0.32rem 0.5rem;
   }
@@ -594,24 +520,6 @@
   .spacer {
     flex: 1;
   }
-  .upload input {
-    display: none;
-  }
-  .upload-btn {
-    border: 1px dashed var(--border);
-    border-radius: var(--radius-sm);
-    padding: 0.45rem 0.85rem;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    color: var(--muted);
-    transition: 130ms ease;
-  }
-  .upload-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
 
   /* ---- segmented control ---- */
   .segmented {
@@ -646,51 +554,6 @@
     margin: 0;
   }
 
-  /* ---- extraction source chip ---- */
-  .source-chip {
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 0.55rem 0.8rem;
-    box-shadow: var(--shadow-sm);
-  }
-  .source-chip img,
-  .source-chip video {
-    width: 44px;
-    height: 44px;
-    object-fit: cover;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-  }
-  .source-meta {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    flex: 1;
-  }
-  .source-name {
-    font-size: 0.84rem;
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .source-hint {
-    font-size: 0.74rem;
-    color: var(--muted);
-  }
-  .faithful {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.8rem;
-    color: var(--muted);
-    cursor: pointer;
-  }
-
   /* ---- cvd row ---- */
   .cvd {
     display: flex;
@@ -708,7 +571,7 @@
   /* ---- cards ---- */
   .grid2 {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
     gap: 1.15rem;
   }
   .card {
@@ -753,9 +616,52 @@
     border-radius: 999px;
     transition: width 220ms ease;
   }
-  .themes {
-    display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
+  /* ---- image gallery section ---- */
+  .gallery-note {
+    margin: 0 0 1rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    max-width: 44rem;
+  }
+
+  /* ---- responsive ---- */
+  @media (max-width: 640px) {
+    main {
+      padding: 1rem 0.9rem 2.5rem;
+      gap: 1rem;
+    }
+    .toolbar {
+      gap: 0.7rem;
+    }
+  }
+  @media (max-width: 560px) {
+    header {
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+    .meta-links {
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+    .hint {
+      display: none;
+    }
+    .toolbar label,
+    .toolbar .field,
+    .toolbar .primary {
+      width: 100%;
+    }
+    .toolbar input[type="number"],
+    .toolbar input[type="text"] {
+      width: 100%;
+    }
+    .toolbar .segmented,
+    .toolbar .primary {
+      width: 100%;
+      justify-content: center;
+    }
+    .spacer {
+      display: none;
+    }
   }
 </style>

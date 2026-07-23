@@ -13,7 +13,7 @@ export interface Oklch {
 
 type Rgb = [number, number, number];
 
-const srgbToLinear = (v: number): number =>
+export const srgbToLinear = (v: number): number =>
   v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
 
 const linearToSrgb = (v: number): number =>
