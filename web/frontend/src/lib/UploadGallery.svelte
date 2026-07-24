@@ -91,10 +91,12 @@
     return name.replace(/\.[^.]+$/, "") || "palette";
   }
 
-  // Hard ceiling on the exported width (8K). We never upscale past the source
-  // image's own resolution, so a small photo exports small; this only caps
-  // genuinely huge originals.
-  const MAX_WIDTH = 7680;
+  // Downloaded card is a 4:5 portrait: photo (cover-cropped) above, palette strip below.
+  const CARD_ASPECT = 5 / 4; // height / width
+  const STRIP_FRAC = 0.12; // strip height as a fraction of card width
+  const IMG_ASPECT = 1 / (CARD_ASPECT - STRIP_FRAC); // width / height of the photo area
+  // Long edge (height) is capped at 8K; we never upscale past the source resolution.
+  const MAX_LONG_EDGE = 7680;
   // WebP at this quality is visually lossless for photos at a fraction of PNG's size.
   const QUALITY = 0.92;
 
@@ -124,21 +126,40 @@
       /* draw whatever decoded; a broken image just yields the strip */
     }
 
-    // Match the source resolution (no upscaling), capped at 8K.
-    const w = Math.min(MAX_WIDTH, img.naturalWidth || 2000);
-    const aspect = img.naturalWidth ? img.naturalHeight / img.naturalWidth : 0.625;
-    const imgH = img.naturalWidth ? Math.round(w * aspect) : 0;
-    const stripH = Math.round(w * 0.12);
+    // Cover-crop the source to the photo-area aspect (like object-fit: cover).
+    const sw = img.naturalWidth;
+    const sh = img.naturalHeight;
+    let sx = 0;
+    let sy = 0;
+    let sWidth = sw;
+    let sHeight = sh;
+    if (sw && sh) {
+      if (sw / sh > IMG_ASPECT) {
+        sWidth = Math.round(sh * IMG_ASPECT);
+        sx = Math.round((sw - sWidth) / 2);
+      } else {
+        sHeight = Math.round(sw / IMG_ASPECT);
+        sy = Math.round((sh - sHeight) / 2);
+      }
+    }
+
+    // Size the canvas to the crop's native width (no upscaling), capped so the
+    // long edge stays within 8K.
+    const maxW = Math.round(MAX_LONG_EDGE / CARD_ASPECT);
+    const w = Math.min(maxW, sWidth || 2000);
+    const canvasH = Math.round(w * CARD_ASPECT);
+    const stripH = Math.round(w * STRIP_FRAC);
+    const imgH = canvasH - stripH;
 
     const canvas = document.createElement("canvas");
     canvas.width = w;
-    canvas.height = imgH + stripH;
+    canvas.height = canvasH;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
 
-    if (imgH) ctx.drawImage(img, 0, 0, w, imgH);
+    if (sw && sh) ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, w, imgH);
 
     const n = card.colors.length;
     const bw = w / n;
